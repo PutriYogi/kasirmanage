@@ -45,6 +45,9 @@ Route::prefix('/admin')->middleware('auth')->group(function () {
 
     Route::get('/transaksi/detail/selesai/{id}', [AdminTransaksiDetailController::class, 'done']);
     Route::get('/transaksi/detail/delete', [AdminTransaksiDetailController::class, 'delete']);
+    // Route::post('/admin/transaksi/detail/selesai/{id}', [AdminTransaksiController::class, 'selesai']);
+    Route::delete('/admin/transaksi/{id}', [AdminTransaksiController::class, 'destroy']);
+    Route::post('/transaksi/detail/selesai/{id}', [AdminTransaksiController::class, 'selesai'])->name('transaksi.selesai');
     Route::post('/transaksi/detail/create', [AdminTransaksiDetailController::class, 'create']);
     Route::resource('/transaksi', AdminTransaksiController::class);
     Route::resource('/produk', AdminProdukController::class);

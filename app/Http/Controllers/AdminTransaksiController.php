@@ -14,16 +14,43 @@ class AdminTransaksiController extends Controller
      *
      * @return \Illuminate\Http\Response
      */
-    public function index()
-    {
-        //
-        $data = [
-            'title'     => 'Manajemen Transaksi',
-            'transaksi'  => Transaksi::orderBy('created_at', 'DESC')->paginate(10),
-            'content'   => 'admin/transaksi/index'
-        ];
-        return view('admin.layouts.wrapper', $data);
+    // public function index()
+    // {
+    //     //
+    //     $data = [
+    //         'title'     => 'Manajemen Transaksi',
+    //         'transaksi'  => Transaksi::orderBy('created_at', 'DESC')->paginate(10),
+    //         'content'   => 'admin/transaksi/index'
+    //     ];
+    //     return view('admin.layouts.wrapper', $data);
+    // }
+    public function index(Request $request)
+{
+    $query = \App\Models\Transaksi::query();
+
+    if ($request->filter == 'today') {
+        $query->whereDate('created_at', today());
+    } elseif ($request->filter == '7days') {
+        $query->where('created_at', '>=', now()->subDays(7));
+    } elseif ($request->filter == '1month') {
+        $query->where('created_at', '>=', now()->subMonth());
     }
+
+    if ($request->tanggal) {
+        $query->whereDate('created_at', $request->tanggal);
+    }
+
+    $transaksi = $query->orderBy('created_at', 'desc')->paginate(10);
+
+    $data = [
+        'title' => 'Data Transaksi',
+        'transaksi' => $transaksi,
+        'content' => 'admin.transaksi.index'
+    ];
+
+    return view('admin.layouts.wrapper', $data);
+}
+
 
     /**
      * Show the form for creating a new resource.
@@ -36,11 +63,26 @@ class AdminTransaksiController extends Controller
         $data = [
             'user_id'   => auth()->user()->id,
             'kasir_name'   => auth()->user()->name,
-            'total'     => 0
+            'total'     => 0,
         ];
         $transaksi = Transaksi::create($data);
         return redirect('/admin/transaksi/' . $transaksi->id . '/edit');
     }
+
+    public function selesai(Request $request, $id)
+{
+    $transaksi = Transaksi::findOrFail($id);
+
+    $transaksi->update([
+        'total'      => $request->total,
+        'status' => 'selesai',
+        // 'dibayarkan' => $request->dibayarkan,
+        // 'kembalian'  => $request->kembalian,
+    ]);
+
+    return redirect('/admin/transaksi')->with('success', 'Transaksi berhasil disimpan');
+}
+
 
 
 
@@ -140,6 +182,9 @@ class AdminTransaksiController extends Controller
      */
     public function destroy($id)
     {
-        //
+        $transaksi = Transaksi::findOrFail($id);
+        $transaksi->delete();
+
+        return redirect()->back()->with('success', 'Transaksi berhasil dihapus');
     }
 }

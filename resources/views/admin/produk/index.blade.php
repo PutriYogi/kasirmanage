@@ -1,5 +1,5 @@
 <div class="row p-2">
-    <div class="col-md-6">
+    <div class="col-md-12">
         <div class="card">
             <div class="card-body">
 
@@ -26,7 +26,9 @@
                                 <form action="/admin/produk/{{ $item->id }}" method="POST">
                                     @method('delete')
                                     @csrf
-                                    <button type="submit" class="btn btn-danger btn-sm ml-1"><i class="fas fa-trash"></i></button>
+                                    <button type="submit" class="btn btn-danger btn-sm ml-1">
+                                        <i class="fas fa-trash"></i>
+                                    </button>
                                 </form>
                             </div>
                         </td>
