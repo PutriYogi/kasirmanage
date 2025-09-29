@@ -43,8 +43,13 @@ Route::prefix('/admin')->middleware('auth')->group(function () {
         return view('admin.layouts.wrapper', $data);
     });
 
+    Route::get('/transaksi/export', [AdminTransaksiController::class, 'export']); // Route untuk export data
+    Route::get('/transaksi/{id}/print', [AdminTransaksiController::class, 'print'])->name('transaksi.print'); // Route untuk print struk
     Route::get('/transaksi/detail/selesai/{id}', [AdminTransaksiDetailController::class, 'done']);
     Route::get('/transaksi/detail/delete', [AdminTransaksiDetailController::class, 'delete']);
+    Route::get('/transaksi/detail/delete-by-produk', [AdminTransaksiDetailController::class, 'deleteByProduk']);
+    Route::get('/transaksi/get-totals/{id}', [AdminTransaksiDetailController::class, 'getTotals']);
+    Route::get('/transaksi/{id}/get-details', [AdminTransaksiDetailController::class, 'getDetails']);
     // Route::post('/admin/transaksi/detail/selesai/{id}', [AdminTransaksiController::class, 'selesai']);
     Route::delete('/admin/transaksi/{id}', [AdminTransaksiController::class, 'destroy']);
     Route::post('/transaksi/detail/selesai/{id}', [AdminTransaksiController::class, 'selesai'])->name('transaksi.selesai');

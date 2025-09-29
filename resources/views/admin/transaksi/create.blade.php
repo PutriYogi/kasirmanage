@@ -1,4 +1,4 @@
-<div class="row p-2">
+    <div class="row p-2">
 
     {{-- Bagian Pilih Produk & Form Tambah --}}
     <div class="col-md-12">
@@ -62,7 +62,19 @@
                     </tr>
                 </thead>
                 <tbody id="table-body">
-                    {{-- JS akan mengisi tabel ini secara dinamis --}}
+                    {{-- Tampilkan data dari database --}}
+                    @foreach($transaksi_detail as $detail)
+                    <tr id="row-{{ $detail->id }}">
+                        <td>{{ $detail->produk_name }}</td>
+                        <td>{{ $detail->qty }}</td>
+                        <td>Rp. {{ number_format($detail->subtotal, 0, ',', '.') }}</td>
+                        <td>
+                            <a href="#" onclick="deleteItemById({{ $detail->id }}, {{ $detail->produk_id }})" class="text-danger">
+                                <i class="fas fa-times"></i>
+                            </a>
+                        </td>
+                    </tr>
+                    @endforeach
                 </tbody>
             </table>
             <hr>
@@ -74,20 +86,6 @@
 
     {{-- input hidden untuk semua produk terpilih akan diisi via JS --}}
     <div id="produk-container"></div>
-
-    {{-- <div class="row mb-3">
-        <div class="col-md-4"><label>QTY Total</label></div>
-        <div class="col-md-8">
-            <h5 class="m-0" id="qty_total">0</h5>
-        </div>
-    </div>
-
-    <div class="row mb-3">
-        <div class="col-md-4"><label>Total</label></div>
-        <div class="col-md-8">
-            <h5 class="m-0" id="subtotal_text">Rp. 0</h5>
-        </div>
-    </div> --}}
 </form>
             </div>
         </div>
@@ -103,12 +101,12 @@
                 {{-- Total & QTY Total --}}
                 <div class="form-group mb-3">
                     <label>QTY Total</label>
-                    <input type="number" id="qty_total_input" class="form-control" value="0" readonly>
+                    <input type="number" id="qty_total_input" class="form-control" value="{{ $transaksi_detail->sum('qty') }}" readonly>
                 </div>
 
                 <div class="form-group mb-3">
                     <label>Total Belanja</label>
-                    <input type="number" id="total_input" class="form-control" value="0" readonly>
+                    <input type="number" id="total_input" class="form-control" value="{{ $transaksi->total }}" readonly>
                 </div>
 
                 {{-- Dibayarkan --}}
@@ -158,6 +156,18 @@ document.addEventListener("DOMContentLoaded", function () {
     let totalQtyGlobal = 0;
     let totalSubtotalGlobal = 0;
 
+    // Load initial totals saat halaman dimuat
+    updateTotalsFromServer();
+
+    // Tampilkan pesan error jika ada
+    @if(session('error'))
+        showToast('{{ session('error') }}', 'error');
+    @endif
+
+    @if(session('success'))
+        showToast('{{ session('success') }}', 'success');
+    @endif
+
     document.querySelectorAll(".produk-card").forEach(card => {
         let id = card.dataset.id;
         let name = card.dataset.name;
@@ -166,12 +176,22 @@ document.addEventListener("DOMContentLoaded", function () {
         let plusBtn = card.querySelector(".plus-btn");
         let minusBtn = card.querySelector(".minus-btn");
 
-        produkData[id] = { name: name, harga: harga, qty: 0 };
+        // Load qty dari database jika ada
+        let currentQty = 0;
+        @foreach($transaksi_detail as $detail)
+            if ({{ $detail->produk_id }} == id) {
+                currentQty = {{ $detail->qty }};
+                qtyInput.value = currentQty;
+            }
+        @endforeach
+
+        produkData[id] = { name: name, harga: harga, qty: currentQty };
 
         plusBtn.addEventListener("click", () => {
             qtyInput.value = parseInt(qtyInput.value) + 1;
             produkData[id].qty = parseInt(qtyInput.value);
             updateView();
+            autoSaveItem(id); // Auto save setiap perubahan
         });
 
         minusBtn.addEventListener("click", () => {
@@ -179,24 +199,23 @@ document.addEventListener("DOMContentLoaded", function () {
                 qtyInput.value = parseInt(qtyInput.value) - 1;
                 produkData[id].qty = parseInt(qtyInput.value);
                 updateView();
+                autoSaveItem(id); // Auto save setiap perubahan
             }
         });
 
-        qtyInput.addEventListener("input", () => {
+        qtyInput.addEventListener("change", () => {
             if (qtyInput.value < 0) qtyInput.value = 0;
             produkData[id].qty = parseInt(qtyInput.value);
             updateView();
+            autoSaveItem(id); // Auto save setiap perubahan
         });
     });
 
     function updateView() {
+        // Hanya update display qty dan subtotal untuk tampilan UI
+        // Tabel akan di-update via AJAX dari server
         totalQtyGlobal = 0;
         totalSubtotalGlobal = 0;
-
-        let container = document.getElementById("produk-container");
-        container.innerHTML = "";
-        let tableBody = document.getElementById("table-body");
-        tableBody.innerHTML = "";
 
         Object.keys(produkData).forEach(id => {
             let p = produkData[id];
@@ -204,43 +223,12 @@ document.addEventListener("DOMContentLoaded", function () {
                 let subtotal = p.qty * p.harga;
                 totalQtyGlobal += p.qty;
                 totalSubtotalGlobal += subtotal;
-
-                // hidden input utk form
-                container.innerHTML += `
-                    <input type="hidden" name="produk_id[]" value="${id}">
-                    <input type="hidden" name="produk_name[]" value="${p.name}">
-                    <input type="hidden" name="qty[]" value="${p.qty}">
-                    <input type="hidden" name="harga[]" value="${p.harga}">
-                    <input type="hidden" name="subtotal[]" value="${subtotal}">
-                `;
-
-                // tabel transaksi
-                tableBody.innerHTML += `
-                    <tr>
-                        <td>${p.name}</td>
-                        <td>${p.qty}</td>
-                        <td>Rp. ${new Intl.NumberFormat("id-ID").format(subtotal)}</td>
-                        <td><a href="#" class="text-danger remove-item" data-id="${id}">
-                            <i class="fas fa-times"></i></a></td>
-                    </tr>
-                `;
             }
         });
 
-        // Update langsung ke bagian pembayaran
-        document.getElementById("qty_total_input").value = totalQtyGlobal;
-        document.getElementById("total_input").value = totalSubtotalGlobal;
-
-        // Event hapus item
-        document.querySelectorAll(".remove-item").forEach(btn => {
-            btn.addEventListener("click", (e) => {
-                e.preventDefault();
-                let id = btn.dataset.id;
-                produkData[id].qty = 0;
-                document.querySelector(`.produk-card[data-id="${id}"] .qty-input`).value = 0;
-                updateView();
-            });
-        });
+        // Update tampilan sementara (akan di-override oleh data dari server)
+        // document.getElementById("qty_total_input").value = totalQtyGlobal;
+        // document.getElementById("total_input").value = totalSubtotalGlobal;
     }
 
     // Bagian Pembayaran
@@ -271,8 +259,21 @@ document.addEventListener("DOMContentLoaded", function () {
     //     kembalianHidden.value = kembalian;
     // });
         hitungBtn.addEventListener("click", function () {
-        let total = totalSubtotalGlobal;
+        // Ambil total dari input yang sudah diupdate dari database
+        let total = parseInt(document.getElementById('total_input').value || 0);
         let dibayarkan = parseInt(dibayarkanInput.value || 0);
+
+        if (total <= 0) {
+            alert("Belum ada item yang dipilih!");
+            kembalianInput.value = "Rp. 0";
+            return;
+        }
+
+        if (dibayarkan <= 0) {
+            alert("Silakan masukkan jumlah uang yang dibayarkan!");
+            kembalianInput.value = "Rp. 0";
+            return;
+        }
 
         if (dibayarkan < total) {
             alert("Uang yang dibayarkan tidak boleh kurang dari total belanja!");
@@ -291,30 +292,44 @@ document.addEventListener("DOMContentLoaded", function () {
         kembalianHidden.value = kembalian;
     });
 
+    // Auto calculate saat input dibayarkan
+    dibayarkanInput.addEventListener('input', function () {
+        const total = parseInt(document.getElementById('total_input').value || 0);
+        const dibayarkan = parseInt(dibayarkanInput.value || 0);
+        
+        if (total > 0 && dibayarkan >= total) {
+            const kembalian = dibayarkan - total;
+            kembalianInput.value = "Rp. " + new Intl.NumberFormat("id-ID").format(kembalian);
+            
+            // Set hidden inputs
+            totalHidden.value = total;
+            dibayarkanHidden.value = dibayarkan;
+            kembalianHidden.value = kembalian;
+        } else if (dibayarkan > 0) {
+            kembalianInput.value = "Rp. 0";
+        }
+    });
+
     const formSelesai = document.getElementById('form-selesai');
 
     formSelesai.addEventListener('submit', async function (e) {
         e.preventDefault();
 
-        // Ambil token CSRF dari salah satu form yang ada
-        const csrf = document.querySelector('input[name="_token"]').value;
-        const transaksiId = "{{ Request::segment(3) }}";
+        // Ambil total dari input yang sudah diupdate dari database
+        const total = parseInt(document.getElementById('total_input').value || 0, 10);
+        const dibayarkan = parseInt(document.getElementById('dibayarkan_input').value || 0, 10);
 
-        // Kumpulkan item dari hidden inputs yang sudah kamu isi di #produk-container
-        const ids    = Array.from(document.querySelectorAll('#produk-container input[name="produk_id[]"]')).map(i => i.value);
-        const names  = Array.from(document.querySelectorAll('#produk-container input[name="produk_name[]"]')).map(i => i.value);
-        const qtys   = Array.from(document.querySelectorAll('#produk-container input[name="qty[]"]')).map(i => i.value);
-        const subs   = Array.from(document.querySelectorAll('#produk-container input[name="subtotal[]"]')).map(i => i.value);
-
-        // Validasi: harus ada item
-        if (ids.length === 0) {
+        // Validasi: harus ada total (berarti ada item)
+        if (total <= 0) {
             alert('Belum ada item yang dipilih.');
             return;
         }
 
-        // Pastikan total/dibayarkan/kembalian terisi walau user lupa tekan "Hitung"
-        const total = totalSubtotalGlobal; // dari perhitungan real-time kamu
-        const dibayarkan = parseInt(document.getElementById('dibayarkan_input').value || 0, 10);
+        // Validasi pembayaran
+        if (dibayarkan <= 0) {
+            alert("Silakan masukkan jumlah uang yang dibayarkan!");
+            return;
+        }
 
         if (dibayarkan < total) {
             alert("Uang yang dibayarkan tidak boleh kurang dari total belanja!");
@@ -322,30 +337,237 @@ document.addEventListener("DOMContentLoaded", function () {
         }
 
         const kembalian = dibayarkan - total;
+
+        // Konfirmasi sebelum menyelesaikan
+        const totalFormatted = new Intl.NumberFormat("id-ID").format(total);
+        const kembalianFormatted = new Intl.NumberFormat("id-ID").format(kembalian);
+        
+        const result = await Swal.fire({
+            title: 'Konfirmasi Selesai Transaksi',
+            html: `
+                <div class="text-left">
+                    <p><strong>Total:</strong> Rp ${totalFormatted}</p>
+                    <p><strong>Dibayar:</strong> Rp ${new Intl.NumberFormat("id-ID").format(dibayarkan)}</p>
+                    <p><strong>Kembalian:</strong> Rp ${kembalianFormatted}</p>
+                </div>
+                <hr>
+                <p>Yakin ingin menyelesaikan transaksi ini?</p>
+            `,
+            icon: 'question',
+            showCancelButton: true,
+            confirmButtonColor: '#28a745',
+            cancelButtonColor: '#6c757d',
+            confirmButtonText: '<i class="fas fa-check"></i> Ya, Selesaikan!',
+            cancelButtonText: '<i class="fas fa-times"></i> Batal'
+        });
+        
+        if (!result.isConfirmed) {
+            return;
+        }
+        
+        // Set hidden inputs untuk dikirim ke server
         document.getElementById('total_hidden').value = total;
         document.getElementById('dibayarkan_hidden').value = dibayarkan;
         document.getElementById('kembalian_hidden').value = kembalian;
 
-        // 1) Simpan detail satu-per-satu memakai endpoint lama
-        for (let i = 0; i < ids.length; i++) {
-            const fd = new FormData();
-            fd.append('_token', csrf);
-            fd.append('transaksi_id', transaksiId);
-            fd.append('produk_id', ids[i]);
-            fd.append('produk_name', names[i]);
-            fd.append('qty', qtys[i]);
-            fd.append('subtotal', subs[i]);
+        // Tampilkan loading
+        const submitBtn = formSelesai.querySelector('button[type="submit"]');
+        const originalText = submitBtn.innerHTML;
+        submitBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Memproses...';
+        submitBtn.disabled = true;
 
-            const resp = await fetch('/admin/transaksi/detail/create', { method: 'POST', body: fd });
-            if (!resp.ok) {
-                alert('Gagal menyimpan salah satu item. Silakan coba lagi.');
-                return;
-            }
-        }
-
-        // 2) Setelah semua detail tersimpan, submit form total (POST ke /transaksi/detail/selesai/{id})
+        // Karena item sudah tersimpan via auto-save, langsung submit form selesai
         formSelesai.submit();
     });
+
+    // Function untuk auto save item ke database
+    function autoSaveItem(produkId) {
+        const produk = produkData[produkId];
+        const transaksiId = "{{ Request::segment(3) }}";
+        
+        if (produk.qty <= 0) {
+            // Jika qty 0, hapus dari database jika ada
+            deleteItemFromDB(produkId);
+            return;
+        }
+
+        const subtotal = produk.qty * produk.harga;
+        
+        // Show loading
+        showToast('Menyimpan...', 'info');
+        
+        // Kirim ke server via AJAX
+        const formData = new FormData();
+        formData.append('_token', document.querySelector('input[name="_token"]').value);
+        formData.append('transaksi_id', transaksiId);
+        formData.append('produk_id', produkId);
+        formData.append('produk_name', produk.name);
+        formData.append('qty', produk.qty);
+        formData.append('subtotal', subtotal);
+
+        fetch('/admin/transaksi/detail/create', {
+            method: 'POST',
+            body: formData,
+            headers: {
+                'X-Requested-With': 'XMLHttpRequest'
+            }
+        })
+        .then(response => {
+            if (!response.ok) {
+                throw new Error('Network response was not ok');
+            }
+            return response.json();
+        })
+        .then(data => {
+            if (data.success) {
+                // Update tampilan total dari server
+                updateTotalsFromServer();
+                // showToast('Item tersimpan!', 'success');
+            } else {
+                showToast('Gagal menyimpan: ' + data.message, 'error');
+            }
+        })
+        .catch(error => {
+            console.error('Error:', error);
+            showToast('Gagal menyimpan item!', 'error');
+        });
+    }
+
+    // Function untuk hapus item dari database
+    function deleteItemFromDB(produkId) {
+        fetch(`/admin/transaksi/detail/delete-by-produk?produk_id=${produkId}&transaksi_id={{ Request::segment(3) }}`, {
+            method: 'GET'
+        })
+        .then(response => response.json())
+        .then(data => {
+            if (data.success) {
+                updateTotalsFromServer();
+                showToast('Item berhasil dihapus!', 'success');
+            }
+        })
+        .catch(error => console.error('Error:', error));
+    }
+
+    // Function untuk update total dari server
+    function updateTotalsFromServer() {
+        fetch(`/admin/transaksi/get-totals/{{ Request::segment(3) }}`)
+        .then(response => response.json())
+        .then(data => {
+            document.getElementById('qty_total_input').value = data.qty_total;
+            document.getElementById('total_input').value = data.total;
+            document.getElementById('total_hidden').value = data.total;
+            
+            // Refresh tabel untuk menampilkan data terbaru
+            refreshTable();
+        });
+    }
+
+    // Function untuk refresh tabel dari server
+    function refreshTable() {
+        fetch(`/admin/transaksi/{{ Request::segment(3) }}/get-details`)
+        .then(response => response.json())
+        .then(data => {
+            const tableBody = document.getElementById('table-body');
+            tableBody.innerHTML = '';
+            
+            data.details.forEach(detail => {
+                const row = `
+                    <tr id="row-${detail.id}">
+                        <td>${detail.produk_name}</td>
+                        <td>${detail.qty}</td>
+                        <td>Rp. ${new Intl.NumberFormat("id-ID").format(detail.subtotal)}</td>
+                        <td>
+                            <a href="#" onclick="deleteItemById(${detail.id}, ${detail.produk_id})" class="text-danger">
+                                <i class="fas fa-times"></i>
+                            </a>
+                        </td>
+                    </tr>
+                `;
+                tableBody.innerHTML += row;
+            });
+        });
+    }
+
+    // Function untuk hapus item berdasarkan ID detail
+    window.deleteItemById = function(detailId, produkId) {
+        // Fallback jika SweetAlert tidak tersedia
+        if (typeof Swal === 'undefined') {
+            if (confirm('Hapus item ini dari transaksi?')) {
+                deleteItemProcess(detailId, produkId);
+            }
+            return;
+        }
+
+        Swal.fire({
+            title: 'Konfirmasi Hapus',
+            text: 'Hapus item ini dari transaksi?',
+            icon: 'warning',
+            showCancelButton: true,
+            confirmButtonColor: '#d33',
+            cancelButtonColor: '#3085d6',
+            confirmButtonText: '<i class="fas fa-trash"></i> Ya, Hapus!',
+            cancelButtonText: '<i class="fas fa-times"></i> Batal',
+            reverseButtons: true
+        }).then((result) => {
+            if (result.isConfirmed) {
+                deleteItemProcess(detailId, produkId);
+            }
+        }).catch((error) => {
+            console.error('SweetAlert error:', error);
+            if (confirm('Hapus item ini dari transaksi?')) {
+                deleteItemProcess(detailId, produkId);
+            }
+        });
+    }
+
+    // Function untuk proses delete item
+    function deleteItemProcess(detailId, produkId) {
+        fetch(`/admin/transaksi/detail/delete?id=${detailId}`, {
+            method: 'GET'
+        })
+        .then(response => {
+            if (response.ok) {
+                // Reset qty di form
+                const qtyInput = document.querySelector(`.produk-card[data-id="${produkId}"] .qty-input`);
+                if (qtyInput) {
+                    qtyInput.value = 0;
+                    produkData[produkId].qty = 0;
+                }
+                
+                // Update totals dan refresh tabel
+                updateTotalsFromServer();
+                showToast('Item berhasil dihapus!', 'success');
+            } else {
+                showToast('Gagal menghapus item!', 'error');
+            }
+        })
+        .catch(error => {
+            console.error('Error:', error);
+            showToast('Gagal menghapus item!', 'error');
+        });
+    }
+
+    // Function untuk menampilkan notifikasi
+    function showToast(message, type) {
+        // Remove existing toasts
+        document.querySelectorAll('.custom-toast').forEach(t => t.remove());
+        
+        // Simple toast notification
+        const toast = document.createElement('div');
+        toast.className = `alert alert-${type === 'success' ? 'success' : (type === 'info' ? 'info' : 'danger')} position-fixed custom-toast`;
+        toast.style.top = '20px';
+        toast.style.right = '20px';
+        toast.style.zIndex = '9999';
+        toast.style.minWidth = '250px';
+        toast.innerHTML = message;
+        document.body.appendChild(toast);
+        
+        if (type !== 'info') {
+            setTimeout(() => {
+                toast.remove();
+            }, 3000);
+        }
+    }
 });
 </script>
 

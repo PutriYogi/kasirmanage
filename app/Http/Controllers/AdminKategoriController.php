@@ -116,8 +116,15 @@ class AdminKategoriController extends Controller
     {
         //
         $kategori = Kategori::find($id);
+        
+        if (!$kategori) {
+            return redirect()->back()->with('error', 'Kategori tidak ditemukan.');
+        }
+        
+        $kategoriName = $kategori->name;
         $kategori->delete();
-        Alert::success('Sukses', 'Data berhasil dihapus');
-        return redirect()->back();
+        
+        // Gunakan session flash message untuk konsistensi
+        return redirect()->back()->with('success', 'Kategori "' . $kategoriName . '" berhasil dihapus.');
     }
 }

@@ -124,6 +124,19 @@ class AdminProdukController extends Controller
         ]);
 
         if ($request->hasFile('gambar')) {
+            // Hapus gambar lama jika ada dan file exists
+            if ($produk->gambar != null && !empty($produk->gambar)) {
+                $oldImagePath = public_path($produk->gambar);
+                if (file_exists($oldImagePath)) {
+                    try {
+                        unlink($oldImagePath);
+                    } catch (\Exception $e) {
+                        \Log::warning('Gagal menghapus gambar lama: ' . $e->getMessage());
+                    }
+                }
+            }
+            
+            // Upload gambar baru
             $gambar = $request->file('gambar');
             $file_name = time() . "_" . $gambar->getClientOriginalName();
 
@@ -149,12 +162,30 @@ class AdminProdukController extends Controller
     {
         //
         $produk = Produk::find($id);
-
-        if ($produk->gambar != null) {
-            unlink($produk->gambar);
+        
+        if (!$produk) {
+            return redirect()->back()->with('error', 'Produk tidak ditemukan.');
         }
+        
+        $produkName = $produk->name;
+        
+        // Hapus file gambar jika ada dan file benar-benar exist
+        if ($produk->gambar != null && !empty($produk->gambar)) {
+            $imagePath = public_path($produk->gambar);
+            
+            // Cek apakah file benar-benar ada sebelum dihapus
+            if (file_exists($imagePath)) {
+                try {
+                    unlink($imagePath);
+                } catch (\Exception $e) {
+                    // Log error tapi tetap lanjut hapus produk
+                    \Log::warning('Gagal menghapus gambar produk: ' . $e->getMessage());
+                }
+            }
+        }
+        
         $produk->delete();
-        Alert::success('Sukses', 'Data berhasil dihapus');
-        return redirect()->back();
+        
+        return redirect()->back()->with('success', 'Produk "' . $produkName . '" berhasil dihapus.');
     }
 }
