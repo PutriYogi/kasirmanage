@@ -14,8 +14,8 @@
                 @endisset
             
                 @csrf
-                    <label for="">Nama Kategori</label>
-                    <input type="text" name="name" class="form-control @error('name') is-invalid @enderror" placeholder="Nama Kategori" value="{{ isset($produk) ? $produk->name : old('name')  }}">
+                    <label for="">Nama Produk</label>
+                    <input type="text" name="name" class="form-control @error('name') is-invalid @enderror" placeholder="Nama Produk" value="{{ isset($produk) ? $produk->name : old('name')  }}">
                     @error('name')
                         <div class="invalid-feedback">
                             {{ $message }}
@@ -43,14 +43,6 @@
                         </div>
                     @enderror
 
-                    <label for="">Stok</label>
-                    <input type="number" name="stok" class="form-control @error('stok') is-invalid @enderror" placeholder="Stok" value="{{ isset($produk) ? $produk->stok : old('stok')  }}">
-                    @error('stok')
-                        <div class="invalid-feedback">
-                            {{ $message }}
-                        </div>
-                    @enderror
-
                     <label for="">Gambar</label>
                     <input type="file" name="gambar" class="form-control @error('gambar') is-invalid @enderror"  value="{{ isset($produk) ? $produk->gambar : old('gambar')  }}">
                     @error('gambar')
@@ -60,7 +52,12 @@
                     @enderror
 
                     @isset($produk)
-                        <img src="/{{ $produk->gambar }}" width="100px" alt="">
+                        @if($produk->gambar)
+                            <div class="mt-2">
+                                <p>Gambar Saat Ini:</p>
+                                <img src="{{ asset($produk->gambar) }}" width="150px" style="border: 1px solid #ddd; border-radius: 5px;" alt="Gambar Produk">
+                            </div>
+                        @endif
                     @endisset
                     <br>
                     

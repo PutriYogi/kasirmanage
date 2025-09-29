@@ -18,9 +18,52 @@ class AdminProdukController extends Controller
     {
         //
         // die('masuk');
+        
+        // Ambil semua kategori untuk filter
+        $kategori = Kategori::all();
+        
+        // Query produk dengan filter kategori dan pencarian
+        $produkQuery = Produk::with('kategori');
+        
+        // Filter berdasarkan kategori
+        if (request('kategori_id')) {
+            $produkQuery->where('kategori_id', request('kategori_id'));
+        }
+        
+        // Filter berdasarkan pencarian nama
+        if (request('search')) {
+            $produkQuery->where('name', 'like', '%' . request('search') . '%');
+        }
+        
+        // Sorting
+        switch (request('sort')) {
+            case 'name_asc':
+                $produkQuery->orderBy('name', 'asc');
+                break;
+            case 'name_desc':
+                $produkQuery->orderBy('name', 'desc');
+                break;
+            case 'harga_asc':
+                $produkQuery->orderBy('harga', 'asc');
+                break;
+            case 'harga_desc':
+                $produkQuery->orderBy('harga', 'desc');
+                break;
+            case 'newest':
+                $produkQuery->orderBy('created_at', 'desc');
+                break;
+            case 'oldest':
+                $produkQuery->orderBy('created_at', 'asc');
+                break;
+            default:
+                $produkQuery->orderBy('created_at', 'desc'); // Default terbaru
+                break;
+        }
+        
         $data = [
             'title'     => 'Manajemen Produk',
-            'produk'  => Produk::paginate(10),
+            'produk'    => $produkQuery->paginate(10)->appends(request()->query()),
+            'kategori'  => $kategori,
             'content'   => 'admin/produk/index'
         ];
         return view('admin.layouts.wrapper', $data);
@@ -55,7 +98,6 @@ class AdminProdukController extends Controller
             'name'  => 'required',
             'kategori_id'  => 'required',
             'harga'  => 'required',
-            'stok'  => 'required',
         ]);
         // dd($request->all());
 
@@ -120,7 +162,6 @@ class AdminProdukController extends Controller
             'name'  => 'required',
             'kategori_id'  => 'required',
             'harga'  => 'required',
-            'stok'  => 'required',
         ]);
 
         if ($request->hasFile('gambar')) {

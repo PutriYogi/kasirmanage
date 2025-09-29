@@ -33,13 +33,6 @@
         </a>
       </li>
 
-      <li class="nav-item">
-        <a href="/admin/user" class="nav-link {{ Request::is('admin/user*') ? 'active' : '' }}">
-          <i class="nav-icon fas fa-users"></i>
-          <p>User</p>
-        </a>
-      </li>
-
       {{-- Spacer untuk dorong logout ke bawah --}}
       <li class="flex-grow-1"></li>
 

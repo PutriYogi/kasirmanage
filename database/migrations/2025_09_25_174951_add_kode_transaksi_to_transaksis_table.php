@@ -14,7 +14,9 @@ return new class extends Migration
     public function up()
     {
         Schema::table('transaksis', function (Blueprint $table) {
-            $table->string('kode_transaksi', 50)->nullable()->after('id');
+            if (!Schema::hasColumn('transaksis', 'kode_transaksi')) {
+                $table->string('kode_transaksi', 50)->nullable()->after('id');
+            }
         });
     }
 

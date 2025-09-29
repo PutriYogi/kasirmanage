@@ -13,9 +13,10 @@ return new class extends Migration
      */
     public function up()
     {
-        Schema::table('transaksis', function (Blueprint $table) {
-            $table->bigInteger('dibayarkan')->nullable()->after('total');
-            $table->bigInteger('kembalian')->nullable()->after('dibayarkan');
+        Schema::table('produks', function (Blueprint $table) {
+            if (Schema::hasColumn('produks', 'stok')) {
+                $table->dropColumn('stok');
+            }
         });
     }
 
@@ -26,8 +27,8 @@ return new class extends Migration
      */
     public function down()
     {
-        Schema::table('transaksis', function (Blueprint $table) {
-            $table->dropColumn(['dibayarkan', 'kembalian']);
+        Schema::table('produks', function (Blueprint $table) {
+            $table->integer('stok')->default(0)->after('harga');
         });
     }
 };

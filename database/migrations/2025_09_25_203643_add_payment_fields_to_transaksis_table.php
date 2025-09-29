@@ -14,7 +14,12 @@ return new class extends Migration
     public function up()
     {
         Schema::table('transaksis', function (Blueprint $table) {
-            //
+            if (!Schema::hasColumn('transaksis', 'dibayarkan')) {
+                $table->bigInteger('dibayarkan')->nullable()->after('total');
+            }
+            if (!Schema::hasColumn('transaksis', 'kembalian')) {
+                $table->bigInteger('kembalian')->nullable()->after('dibayarkan');
+            }
         });
     }
 
@@ -26,7 +31,12 @@ return new class extends Migration
     public function down()
     {
         Schema::table('transaksis', function (Blueprint $table) {
-            //
+            if (Schema::hasColumn('transaksis', 'kembalian')) {
+                $table->dropColumn('kembalian');
+            }
+            if (Schema::hasColumn('transaksis', 'dibayarkan')) {
+                $table->dropColumn('dibayarkan');
+            }
         });
     }
 };

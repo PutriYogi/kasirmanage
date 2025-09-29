@@ -23,7 +23,7 @@
                  data-id="{{ $item->id }}" 
                  data-name="{{ $item->name }}" 
                  data-harga="{{ $item->harga }}">
-                <img src="{{ asset(''.$item->gambar) }}" 
+                <img src="{{ asset($item->gambar) }}" 
                      class="card-img-top" 
                      style="height:150px; object-fit:contain;" 
                      alt="{{ $item->name }}">
