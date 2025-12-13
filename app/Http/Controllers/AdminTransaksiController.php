@@ -27,31 +27,60 @@ class AdminTransaksiController extends Controller
     //     return view('admin.layouts.wrapper', $data);
     // }
     public function index(Request $request)
-{
-    $query = \App\Models\Transaksi::query();
+    {
+        $query = \App\Models\Transaksi::query();
 
-    if ($request->filter == 'today') {
-        $query->whereDate('created_at', today());
-    } elseif ($request->filter == '7days') {
-        $query->where('created_at', '>=', now()->subDays(7));
-    } elseif ($request->filter == '1month') {
-        $query->where('created_at', '>=', now()->subMonth());
+        // Filter berdasarkan periode seperti di dashboard
+        $periode = $request->get('periode');
+        $customStart = $request->get('start_date');
+        $customEnd = $request->get('end_date');
+
+        if ($periode) {
+            if ($periode === 'custom' && $customStart && $customEnd) {
+                // Custom date range
+                $query->whereBetween('created_at', [
+                    \Carbon\Carbon::parse($customStart)->startOfDay(),
+                    \Carbon\Carbon::parse($customEnd)->endOfDay()
+                ]);
+            } else {
+                // Preset periods
+                switch ($periode) {
+                    case 'hari':
+                        $query->whereDate('created_at', \Carbon\Carbon::today());
+                        break;
+                    case 'minggu':
+                        $query->whereBetween('created_at', [
+                            \Carbon\Carbon::now()->startOfWeek(),
+                            \Carbon\Carbon::now()->endOfWeek()
+                        ]);
+                        break;
+                    case 'bulan':
+                        $query->whereMonth('created_at', \Carbon\Carbon::now()->month)
+                              ->whereYear('created_at', \Carbon\Carbon::now()->year);
+                        break;
+                    case '7hari':
+                        $query->where('created_at', '>=', \Carbon\Carbon::now()->subDays(7));
+                        break;
+                    case '30hari':
+                        $query->where('created_at', '>=', \Carbon\Carbon::now()->subDays(30));
+                        break;
+                }
+            }
+        }
+
+        $transaksi = $query->orderBy('created_at', 'desc')->paginate(10);
+        
+        // Preserve filter parameters in pagination
+        $transaksi->appends($request->all());
+
+        $data = [
+            'title' => 'Data Transaksi',
+            'transaksi' => $transaksi,
+            'content' => 'admin.transaksi.index'
+        ];
+
+        return view('admin.layouts.wrapper', $data);
     }
-
-    if ($request->tanggal) {
-        $query->whereDate('created_at', $request->tanggal);
-    }
-
-    $transaksi = $query->orderBy('created_at', 'desc')->paginate(10);
-
-    $data = [
-        'title' => 'Data Transaksi',
-        'transaksi' => $transaksi,
-        'content' => 'admin.transaksi.index'
-    ];
-
-    return view('admin.layouts.wrapper', $data);
-}
 
 
     /**
@@ -91,15 +120,33 @@ class AdminTransaksiController extends Controller
     // Validasi data pembayaran
     $dibayarkan = (int) $request->dibayarkan;
     $kembalian = (int) $request->kembalian;
+    $metodePembayaran = $request->metode_pembayaran ?? 'cash';
     
-    if ($dibayarkan < $calculatedTotal) {
+    // Validasi untuk cash: dibayarkan harus >= total
+    if ($metodePembayaran == 'cash' && $dibayarkan < $calculatedTotal) {
         return redirect()->back()->with('error', 'Jumlah dibayar tidak boleh kurang dari total transaksi.');
+    }
+    
+    // Untuk QRIS: set dibayarkan = total dan kembalian = 0
+    if ($metodePembayaran == 'qris') {
+        $dibayarkan = $calculatedTotal;
+        $kembalian = 0;
     }
 
     $transaksi->update([
         'status' => 'selesai',
         'dibayarkan' => $dibayarkan,
         'kembalian'  => $kembalian,
+        'metode_pembayaran' => $metodePembayaran,
+    ]);
+
+    // Set session untuk SweetAlert sukses
+    session()->flash('transaksi_selesai', [
+        'total' => $calculatedTotal,
+        'dibayarkan' => $dibayarkan,
+        'kembalian' => $kembalian,
+        'metode_pembayaran' => $metodePembayaran,
+        'kode' => $transaksi->kode_transaksi ?? 'TRX-' . $transaksi->id
     ]);
 
     return redirect('/admin/transaksi')->with('success', 'Transaksi berhasil diselesaikan dengan total: Rp ' . number_format($calculatedTotal, 0, ',', '.'));
@@ -222,19 +269,53 @@ class AdminTransaksiController extends Controller
 
     public function export(Request $request)
     {
-        // Query data sesuai filter yang sama dengan index
+        // Query data sesuai filter yang sama dengan index (menggunakan periode)
         $query = \App\Models\Transaksi::query();
 
-        if ($request->filter == 'today') {
-            $query->whereDate('created_at', today());
-        } elseif ($request->filter == '7days') {
-            $query->where('created_at', '>=', now()->subDays(7));
-        } elseif ($request->filter == '1month') {
-            $query->where('created_at', '>=', now()->subMonth());
-        }
+        // Filter berdasarkan periode seperti di dashboard dan index
+        $periode = $request->get('periode');
+        $customStart = $request->get('start_date');
+        $customEnd = $request->get('end_date');
 
-        if ($request->tanggal) {
-            $query->whereDate('created_at', $request->tanggal);
+        $filterLabel = 'Semua Data';
+
+        if ($periode) {
+            if ($periode === 'custom' && $customStart && $customEnd) {
+                // Custom date range
+                $query->whereBetween('created_at', [
+                    \Carbon\Carbon::parse($customStart)->startOfDay(),
+                    \Carbon\Carbon::parse($customEnd)->endOfDay()
+                ]);
+                $filterLabel = "Custom: {$customStart} s/d {$customEnd}";
+            } else {
+                // Preset periods
+                switch ($periode) {
+                    case 'hari':
+                        $query->whereDate('created_at', \Carbon\Carbon::today());
+                        $filterLabel = 'Hari Ini';
+                        break;
+                    case 'minggu':
+                        $query->whereBetween('created_at', [
+                            \Carbon\Carbon::now()->startOfWeek(),
+                            \Carbon\Carbon::now()->endOfWeek()
+                        ]);
+                        $filterLabel = 'Minggu Ini';
+                        break;
+                    case 'bulan':
+                        $query->whereMonth('created_at', \Carbon\Carbon::now()->month)
+                              ->whereYear('created_at', \Carbon\Carbon::now()->year);
+                        $filterLabel = 'Bulan Ini';
+                        break;
+                    case '7hari':
+                        $query->where('created_at', '>=', \Carbon\Carbon::now()->subDays(7));
+                        $filterLabel = '7 Hari Terakhir';
+                        break;
+                    case '30hari':
+                        $query->where('created_at', '>=', \Carbon\Carbon::now()->subDays(30));
+                        $filterLabel = '30 Hari Terakhir';
+                        break;
+                }
+            }
         }
 
         $transaksi = $query->orderBy('created_at', 'desc')->get();
@@ -248,27 +329,27 @@ class AdminTransaksiController extends Controller
         // Siapkan data untuk export
         $data = [];
         
-        // Header informasi - Menggunakan kolom A-F
-        $data[] = ['LAPORAN DATA TRANSAKSI', '', '', '', '', ''];
-        $data[] = ['Generated at', ':', date('d-m-Y H:i:s'), '', '', ''];
-        $data[] = ['Filter', ':', $request->filter ? ucfirst($request->filter) : 'Semua Data', '', '', ''];
-        if ($request->tanggal) {
-            $data[] = ['Tanggal', ':', $request->tanggal, '', '', ''];
+        // Header informasi - Menggunakan kolom A-G
+        $data[] = ['LAPORAN DATA TRANSAKSI', '', '', '', '', '', ''];
+        $data[] = ['Generated at', ':', date('d-m-Y H:i:s'), '', '', '', ''];
+        $data[] = ['Filter Periode', ':', $filterLabel, '', '', '', ''];
+        if ($periode === 'custom' && $customStart && $customEnd) {
+            $data[] = ['Rentang Tanggal', ':', $customStart . ' sampai ' . $customEnd, '', '', '', ''];
         }
-        $data[] = ['', '', '', '', '', '']; // Empty row
+        $data[] = ['', '', '', '', '', '', '']; // Empty row
         
         // Statistik - Format tabel 2 kolom
-        $data[] = ['RINGKASAN STATISTIK', '', '', '', '', ''];
-        $data[] = ['Keterangan', 'Jumlah', '', '', '', ''];
-        $data[] = ['Total Transaksi', $totalTransaksi, '', '', '', ''];
-        $data[] = ['Total Nilai (Rp)', $totalNilai, '', '', '', '']; // Angka murni untuk Excel
-        $data[] = ['Transaksi Selesai', $transaksiSelesai, '', '', '', ''];
-        $data[] = ['Transaksi Pending', $transaksiPending, '', '', '', ''];
-        $data[] = ['', '', '', '', '', '']; // Empty row
+        $data[] = ['RINGKASAN STATISTIK', '', '', '', '', '', ''];
+        $data[] = ['Keterangan', 'Jumlah', '', '', '', '', ''];
+        $data[] = ['Total Transaksi', $totalTransaksi, '', '', '', '', ''];
+        $data[] = ['Total Nilai (Rp)', $totalNilai, '', '', '', '', '']; // Angka murni untuk Excel
+        $data[] = ['Transaksi Selesai', $transaksiSelesai, '', '', '', '', ''];
+        $data[] = ['Transaksi Pending', $transaksiPending, '', '', '', '', ''];
+        $data[] = ['', '', '', '', '', '', '']; // Empty row
         
-        // Header tabel data - 6 kolom terpisah
-        $data[] = ['DATA TRANSAKSI', '', '', '', '', ''];
-        $data[] = ['ID', 'Kode Transaksi', 'Kasir', 'Total (Rp)', 'Status', 'Tanggal'];
+        // Header tabel data - 7 kolom terpisah
+        $data[] = ['DATA TRANSAKSI', '', '', '', '', '', ''];
+        $data[] = ['ID', 'Kode Transaksi', 'Kasir', 'Total (Rp)', 'Status', 'Metode Pembayaran', 'Tanggal'];
 
         foreach ($transaksi as $item) {
             $data[] = [
@@ -277,7 +358,8 @@ class AdminTransaksiController extends Controller
                 $item->kasir_name ?? 'Unknown',                   // Kolom C: Kasir
                 $item->total,                                     // Kolom D: Total (angka murni)
                 ucfirst($item->status),                           // Kolom E: Status
-                $item->created_at->format('d-m-Y H:i:s')         // Kolom F: Tanggal
+                strtoupper($item->metode_pembayaran ?? 'CASH'),   // Kolom F: Metode Pembayaran
+                $item->created_at->format('d-m-Y H:i:s')         // Kolom G: Tanggal
             ];
         }
 
@@ -311,8 +393,8 @@ class AdminTransaksiController extends Controller
             fprintf($output, chr(0xEF).chr(0xBB).chr(0xBF));
             
             foreach ($data as $row) {
-                // Pastikan setiap row punya 6 kolom
-                $row = array_pad($row, 6, '');
+                // Pastikan setiap row punya 7 kolom
+                $row = array_pad($row, 7, '');
                 
                 // Gunakan semicolon sebagai delimiter (standard Excel Indonesia)
                 fputcsv($output, $row, ';');

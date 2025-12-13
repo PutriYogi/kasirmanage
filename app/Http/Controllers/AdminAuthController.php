@@ -23,8 +23,12 @@ class AdminAuthController extends Controller
 
         if (Auth::attempt($data)) {
             $request->session()->regenerate();
+            
+            // Set flag bahwa user baru saja login untuk menampilkan welcome alert
+            session()->flash('show_welcome', true);
+            
             Alert::success('Sukses', 'Selamat Datang Admin');
-            return redirect('/admin/transaksi');
+            return redirect('/admin/dashboard');
         }
 
         return back()->with('loginError', 'Email atau password salah');

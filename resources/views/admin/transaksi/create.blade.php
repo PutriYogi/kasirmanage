@@ -109,19 +109,40 @@
                     <input type="number" id="total_input" class="form-control" value="{{ $transaksi->total }}" readonly>
                 </div>
 
-                {{-- Dibayarkan --}}
+                {{-- Metode Pembayaran --}}
                 <div class="form-group mb-3">
+                    <label class="mb-2">Metode Pembayaran</label>
+                    <div class="btn-group w-100" role="group" aria-label="Metode Pembayaran">
+                        <button type="button" class="btn btn-secondary metode-btn active" data-metode="cash" id="btn-cash" style="transition: all 0.3s ease;">
+                            <i class="fas fa-money-bill-alt"></i> Cash
+                        </button>
+                        <button type="button" class="btn btn-secondary metode-btn" data-metode="qris" id="btn-qris" style="transition: all 0.3s ease;">
+                            <i class="fas fa-qrcode"></i> QRIS
+                        </button>
+                    </div>
+                    <input type="hidden" name="metode_pembayaran" id="metode_pembayaran" value="cash">
+                </div>
+
+<style>
+.metode-btn.active {
+    background-color: #007bff !important;
+    border-color: #007bff !important;
+    color: white !important;
+}
+.metode-btn:hover {
+    transform: translateY(-1px);
+    box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+}
+</style>
+
+                {{-- Dibayarkan --}}
+                <div class="form-group mb-3" id="dibayarkan-container">
                     <label>Dibayarkan</label>
                     <input type="number" id="dibayarkan_input" name="dibayarkan" class="form-control">
                 </div>
 
-                {{-- Tombol Hitung --}}
-                <button type="button" id="hitung-btn" class="btn btn-primary w-100">Hitung</button>
-
-                <hr>
-
                 {{-- Kembalian --}}
-                <div class="form-group">
+                <div class="form-group" id="kembalian-container">
                     <label>Uang Kembalian</label>
                     <input type="text" id="kembalian_input" class="form-control" value="Rp. 0" readonly>
                 </div>
@@ -144,6 +165,7 @@
                 <input type="hidden" name="total" id="total_hidden">
                 <input type="hidden" name="dibayarkan" id="dibayarkan_hidden">
                 <input type="hidden" name="kembalian" id="kembalian_hidden">
+                <input type="hidden" name="metode_pembayaran" id="metode_pembayaran_hidden" value="cash">
                 <button type="submit" class="btn btn-success px-4">Selesai</button>
             </form>
         </div>
@@ -231,66 +253,60 @@ document.addEventListener("DOMContentLoaded", function () {
         // document.getElementById("total_input").value = totalSubtotalGlobal;
     }
 
+    // Bagian Metode Pembayaran
+    const metodeBtns = document.querySelectorAll('.metode-btn');
+    const metodeInput = document.getElementById('metode_pembayaran');
+    const metodeHidden = document.getElementById('metode_pembayaran_hidden');
+    const dibayarkanContainer = document.getElementById('dibayarkan-container');
+    const kembalianContainer = document.getElementById('kembalian-container');
+
+    metodeBtns.forEach(btn => {
+        btn.addEventListener('click', function() {
+            // Remove active class from all buttons
+            metodeBtns.forEach(b => b.classList.remove('active', 'btn-primary'));
+            metodeBtns.forEach(b => b.classList.add('btn-secondary'));
+            
+            // Add active class to clicked button
+            this.classList.remove('btn-secondary');
+            this.classList.add('active', 'btn-primary');
+            
+            const metode = this.getAttribute('data-metode');
+            metodeInput.value = metode;
+            metodeHidden.value = metode;
+            
+            if (metode === 'qris') {
+                // Hide dibayarkan dan kembalian untuk QRIS
+                dibayarkanContainer.style.display = 'none';
+                kembalianContainer.style.display = 'none';
+                
+                // Set nilai default untuk QRIS (dibayar sesuai total)
+                const total = parseInt(document.getElementById('total_input').value || 0);
+                document.getElementById('dibayarkan_input').value = total;
+                document.getElementById('kembalian_input').value = "Rp. 0";
+                
+                // Set hidden inputs
+                totalHidden.value = total;
+                dibayarkanHidden.value = total;
+                kembalianHidden.value = 0;
+            } else {
+                // Show dibayarkan dan kembalian untuk Cash
+                dibayarkanContainer.style.display = 'block';
+                kembalianContainer.style.display = 'block';
+                
+                // Reset nilai
+                document.getElementById('dibayarkan_input').value = '';
+                document.getElementById('kembalian_input').value = "Rp. 0";
+            }
+        });
+    });
+
     // Bagian Pembayaran
     let dibayarkanInput = document.getElementById("dibayarkan_input");
     let kembalianInput = document.getElementById("kembalian_input");
-    let hitungBtn = document.getElementById("hitung-btn");
 
     let totalHidden = document.getElementById("total_hidden");
     let dibayarkanHidden = document.getElementById("dibayarkan_hidden");
     let kembalianHidden = document.getElementById("kembalian_hidden");
-
-    // hitungBtn.addEventListener("click", function () {
-    //     let total = totalSubtotalGlobal;
-    //     let dibayarkan = parseInt(dibayarkanInput.value || 0);
-
-    //     if (dibayarkan < total) {
-    //         alert("Uang yang dibayarkan tidak boleh kurang dari total belanja!");
-    //         kembalianInput.value = "Rp. 0";
-    //         return;
-    //     }
-
-    //     let kembalian = dibayarkan - total;
-    //     kembalianInput.value = "Rp. " + new Intl.NumberFormat("id-ID").format(kembalian);
-
-    //     // isi hidden input
-    //     totalHidden.value = total;
-    //     dibayarkanHidden.value = dibayarkan;
-    //     kembalianHidden.value = kembalian;
-    // });
-        hitungBtn.addEventListener("click", function () {
-        // Ambil total dari input yang sudah diupdate dari database
-        let total = parseInt(document.getElementById('total_input').value || 0);
-        let dibayarkan = parseInt(dibayarkanInput.value || 0);
-
-        if (total <= 0) {
-            alert("Belum ada item yang dipilih!");
-            kembalianInput.value = "Rp. 0";
-            return;
-        }
-
-        if (dibayarkan <= 0) {
-            alert("Silakan masukkan jumlah uang yang dibayarkan!");
-            kembalianInput.value = "Rp. 0";
-            return;
-        }
-
-        if (dibayarkan < total) {
-            alert("Uang yang dibayarkan tidak boleh kurang dari total belanja!");
-            kembalianInput.value = "Rp. 0";
-            return;
-        }
-
-        let kembalian = dibayarkan - total;
-
-        // tampilkan ke user
-        kembalianInput.value = "Rp. " + new Intl.NumberFormat("id-ID").format(kembalian);
-
-        // set hidden input untuk dikirim
-        totalHidden.value = total;
-        dibayarkanHidden.value = dibayarkan;
-        kembalianHidden.value = kembalian;
-    });
 
     // Auto calculate saat input dibayarkan
     dibayarkanInput.addEventListener('input', function () {
@@ -321,18 +337,48 @@ document.addEventListener("DOMContentLoaded", function () {
 
         // Validasi: harus ada total (berarti ada item)
         if (total <= 0) {
-            alert('Belum ada item yang dipilih.');
+            Swal.fire({
+                icon: 'warning',
+                title: 'Belum Ada Item',
+                text: 'Belum ada item yang dipilih. Silakan pilih produk terlebih dahulu.',
+                confirmButtonText: 'OK',
+                confirmButtonColor: '#3085d6'
+            });
             return;
         }
 
         // Validasi pembayaran
         if (dibayarkan <= 0) {
-            alert("Silakan masukkan jumlah uang yang dibayarkan!");
+            Swal.fire({
+                icon: 'warning',
+                title: 'Input Pembayaran',
+                text: 'Silakan masukkan jumlah uang yang dibayarkan!',
+                confirmButtonText: 'OK',
+                confirmButtonColor: '#3085d6'
+            });
             return;
         }
 
         if (dibayarkan < total) {
-            alert("Uang yang dibayarkan tidak boleh kurang dari total belanja!");
+            const totalFormatted = new Intl.NumberFormat("id-ID").format(total);
+            const dibayarkanFormatted = new Intl.NumberFormat("id-ID").format(dibayarkan);
+            const kurang = new Intl.NumberFormat("id-ID").format(total - dibayarkan);
+            
+            Swal.fire({
+                icon: 'error',
+                title: 'Pembayaran Tidak Cukup',
+                html: `
+                    <div class="text-left">
+                        <p><strong>Total Belanja:</strong> Rp ${totalFormatted}</p>
+                        <p><strong>Dibayarkan:</strong> Rp ${dibayarkanFormatted}</p>
+                        <p><strong>Kurang:</strong> <span class="text-danger">Rp ${kurang}</span></p>
+                    </div>
+                    <hr>
+                    <p>Uang yang dibayarkan tidak boleh kurang dari total belanja!</p>
+                `,
+                confirmButtonText: 'OK',
+                confirmButtonColor: '#d33'
+            });
             return;
         }
 
