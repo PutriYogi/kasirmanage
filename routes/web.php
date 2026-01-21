@@ -9,6 +9,9 @@ use App\Http\Controllers\AdminProdukController;
 use App\Http\Controllers\AdminTransaksiController;
 use App\Http\Controllers\AdminTransaksiDetailController;
 use App\Http\Controllers\AdminUserController;
+use App\Http\Controllers\AdminDashboardController;
+use App\Http\Controllers\AdminReportingController;
+use App\Http\Controllers\AdminPengeluaranController;
 use Illuminate\Support\Facades\Route;
 
 /*
@@ -27,21 +30,11 @@ Route::get('/login', [AdminAuthController::class, 'index'])->name('login')->midd
 Route::post('/login/do', [AdminAuthController::class, 'doLogin'])->middleware('guest');
 Route::get('logout', [AdminAuthController::class, 'logout'])->middleware('auth');
 
-Route::get('/', function () {
-    $data = [
-        'content'   => 'admin.dashboard.index'
-    ];
-    return view('admin.layouts.wrapper', $data);
-})->middleware('auth');
+Route::get('/', [AdminDashboardController::class, 'index'])->middleware('auth');
 
 
 Route::prefix('/admin')->middleware('auth')->group(function () {
-    Route::get('/dashboard', function () {
-        $data = [
-            'content'   => 'admin.dashboard.index'
-        ];
-        return view('admin.layouts.wrapper', $data);
-    });
+    Route::get('/dashboard', [AdminDashboardController::class, 'index']);
 
     Route::get('/transaksi/export', [AdminTransaksiController::class, 'export']); // Route untuk export data
     Route::get('/transaksi/{id}/print', [AdminTransaksiController::class, 'print'])->name('transaksi.print'); // Route untuk print struk
@@ -57,5 +50,16 @@ Route::prefix('/admin')->middleware('auth')->group(function () {
     Route::resource('/transaksi', AdminTransaksiController::class);
     Route::resource('/produk', AdminProdukController::class);
     Route::resource('/kategori', AdminKategoriController::class);
+
+    // Routes untuk Reporting
+    Route::get('/reporting', [AdminReportingController::class, 'index']);
+    Route::get('/reporting/export', [AdminReportingController::class, 'export']);
+    
+    // Routes untuk Pengeluaran
+    Route::get('/pengeluaran/export', [AdminPengeluaranController::class, 'export'])->name('admin.pengeluaran.export');
+    Route::resource('/pengeluaran', AdminPengeluaranController::class, [
+        'as' => 'admin'
+    ]);
+    
     Route::resource('/user', AdminUserController::class);
 });

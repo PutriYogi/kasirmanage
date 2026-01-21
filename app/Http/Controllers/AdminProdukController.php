@@ -6,6 +6,7 @@ use App\Models\Kategori;
 use Illuminate\Http\Request;
 use App\Models\Produk;
 use RealRashid\SweetAlert\Facades\Alert;
+use Illuminate\Support\Facades\Log;
 
 class AdminProdukController extends Controller
 {
@@ -172,7 +173,7 @@ class AdminProdukController extends Controller
                     try {
                         unlink($oldImagePath);
                     } catch (\Exception $e) {
-                        \Log::warning('Gagal menghapus gambar lama: ' . $e->getMessage());
+                        Log::warning('Gagal menghapus gambar lama: ' . $e->getMessage());
                     }
                 }
             }
@@ -220,7 +221,7 @@ class AdminProdukController extends Controller
                     unlink($imagePath);
                 } catch (\Exception $e) {
                     // Log error tapi tetap lanjut hapus produk
-                    \Log::warning('Gagal menghapus gambar produk: ' . $e->getMessage());
+                    Log::warning('Gagal menghapus gambar produk: ' . $e->getMessage());
                 }
             }
         }

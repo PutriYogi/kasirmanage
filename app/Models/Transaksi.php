@@ -16,7 +16,8 @@ class Transaksi extends Model
         'kembalian', 
         'kasir_name', 
         'status',
-        'kode_transaksi'
+        'kode_transaksi',
+        'metode_pembayaran'
     ];
 
     protected static function boot()
