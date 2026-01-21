@@ -30,7 +30,12 @@ Route::get('/login', [AdminAuthController::class, 'index'])->name('login')->midd
 Route::post('/login/do', [AdminAuthController::class, 'doLogin'])->middleware('guest');
 Route::get('logout', [AdminAuthController::class, 'logout'])->middleware('auth');
 
-Route::get('/', [AdminDashboardController::class, 'index'])->middleware('auth');
+Route::get('/', function () {
+    if (auth()->check()) {
+        return redirect('/admin/dashboard');
+    }
+    return redirect('/login');
+});
 
 
 Route::prefix('/admin')->middleware('auth')->group(function () {
